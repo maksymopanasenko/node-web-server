@@ -7,44 +7,42 @@ server.on('request', handleRequest);
 
 server.listen(8000, () => console.log('Server started at http://localhost:8000'));
 
-function handleRequest(request, response) {
-    console.log(request.url);
-
-    recognizeMIMEType(request.url);
-
-    function recognizeMIMEType(url) {
-        if (url == '/favicon.ico') {
-            response.end('Not found');
-        } else {
-            fs.readFile(`./${url}`, (err, data) => {
-                if (err) return console.log(err);
+async function handleRequest(request, response) {
+    const {url, method} = request;
+    console.log(url);
     
-                response.end(data);
-            });
-        }
+    if (method == 'GET') {
+        fs.readFile(url.slice(1) || 'index.html', (err, data) => {
+            if (!err) return response.end(data);
+    
+            response.statusCode = 404;
+            response.end('File or path not found: ' + url);
+        });
+    } else if (method == 'POST') {
+        const body = await getBody(request);
+
+        addToDB(JSON.parse(body));
     }
+}
 
+function addToDB(obj) {
+    fs.readFile('db.json', 'utf-8', (err, json) => {
+        if (err) return console.log(err);
 
-    // if (request.url == '/index.html') {
-    //     fs.readFile('./index.html', (err, html) => {
-    //         if (err) return console.log(err);
+        const data = JSON.parse(json);
 
-    //         response.end(html);
-    //     });
-    // } else if (request.url == '/style.css') {
-    //     fs.readFile('./style.css', (err, css) => {
-    //         if (err) return console.log(err);
+        data.push(obj);
+        
+        json = JSON.stringify(data, null, 4);
+        
+        fs.writeFile('db.json', json, err => err && console.error(err));
+    });
+}
 
-    //         response.end(css);
-    //     });
-    // } else if (request.url == '/script.js') {
-    //     fs.readFile('./script.js', (err, js) => {
-    //         if (err) return console.log(err);
-    //         response.setHeader('Content-type', 'application/javascript');
+async function getBody(request) {
+    const chunks = [];
+    
+    for await (const chunk of request) chunks.push(chunk);
 
-    //         response.end(js);
-    //     });
-    // } else {
-    //     response.end('Not found');
-    // }
+    return Buffer.concat(chunks).toString();
 }
